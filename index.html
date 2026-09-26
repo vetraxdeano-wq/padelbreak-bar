@@ -593,7 +593,12 @@ async function uploadImage(id, file) {
     return;
   }
   const { data: pub } = sb.storage.from("item-images").getPublicUrl(path);
-  await sb.rpc("set_item_image", { p_item_id: id, p_image_url: pub.publicUrl });
+  const { error: linkErr } = await sb.rpc("set_item_image", { p_item_id: id, p_image_url: pub.publicUrl });
+  if (linkErr) {
+    alert("Échec de l'enregistrement de la photo (connexion ?) : " + linkErr.message);
+    fetchItems();
+    return;
+  }
   // Supprime l'ancienne photo du stockage pour éviter d'accumuler des fichiers inutiles.
   if (oldUrl) {
     const oldPath = oldUrl.split("/item-images/")[1];
@@ -736,12 +741,13 @@ document.getElementById("editForm").addEventListener("submit", async (e) => {
   const categorie = editCategorie.value;
   const seuil = Number(document.getElementById("editSeuil").value);
   closeEdit();
-  await sb.rpc("update_item", {
+  const { error } = await sb.rpc("update_item", {
     p_item_id: id,
     p_nom: nom,
     p_categorie: categorie,
     p_seuil_alerte: Number.isFinite(seuil) ? seuil : null,
   });
+  if (error) alert("Échec de l'enregistrement (connexion ?) : " + error.message);
   fetchItems();
 });
 

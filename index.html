@@ -275,6 +275,7 @@ let items = [];
 const pendingIds = new Set();
 let restockItem = null;
 let restockMode = "ajout";
+let restockSubmitting = false;
 let thumbTargetId = null;
 let view = "inventory";
 let searchQuery = "";
@@ -630,10 +631,15 @@ addCategorie.addEventListener("change", () => {
   if (!addSeuilTouched) addSeuil.value = seuilDefaultForCategory(addCategorie.value);
 });
 addSeuil.addEventListener("input", () => { addSeuilTouched = true; });
-document.getElementById("addForm").addEventListener("submit", (e) => {
+document.getElementById("addForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const nom = document.getElementById("addNom").value.trim();
   if (!nom) return;
+  const doublon = items.some((i) => i.nom.trim().toLowerCase() === nom.toLowerCase());
+  if (doublon) {
+    const ok = await askConfirm("Article déjà existant", `« ${nom} » existe déjà dans l'inventaire. L'ajouter quand même ?`);
+    if (!ok) return;
+  }
   addItem(
     {
       nom,
@@ -650,6 +656,7 @@ const restockOverlay = document.getElementById("restockOverlay");
 function openRestock(id) {
   restockItem = items.find((i) => i.id === id);
   if (!restockItem) return;
+  restockSubmitting = false;
   document.getElementById("restockTitle").textContent = `Réappro — ${restockItem.nom}`;
   setRestockMode("ajout");
   restockOverlay.classList.remove("hidden");
@@ -687,15 +694,17 @@ document.getElementById("restockCancel").addEventListener("click", closeRestock)
 restockOverlay.addEventListener("click", (e) => { if (e.target === restockOverlay) closeRestock(); });
 document.getElementById("restockForm").addEventListener("submit", (e) => {
   e.preventDefault();
+  if (restockSubmitting) return;
   const n = Number(document.getElementById("restockValeur").value);
   if (!Number.isFinite(n)) return;
+  restockSubmitting = true;
   if (restockMode === "ajout") {
-    if (n <= 0) return;
-    confirmRestock(n, "reappro");
+    if (n <= 0) { restockSubmitting = false; return; }
+    confirmRestock(n, "reappro").finally(() => { restockSubmitting = false; });
   } else {
     const delta = n - restockItem.quantite;
-    if (delta === 0) { closeRestock(); return; }
-    confirmRestock(delta, "ajustement");
+    if (delta === 0) { closeRestock(); restockSubmitting = false; return; }
+    confirmRestock(delta, "ajustement").finally(() => { restockSubmitting = false; });
   }
 });
 
@@ -890,6 +899,11 @@ async function onPointerUp(e) {
 sb.channel("inventaire_bar_changes")
   .on("postgres_changes", { event: "*", schema: "public", table: "inventaire_bar" }, fetchItems)
   .subscribe();
+
+// Filet de sécurité : si la connexion temps réel se coupe silencieusement (wifi
+// capricieux), on rafraîchit quand même régulièrement pour ne pas rester bloqué
+// sur d'anciennes quantités.
+setInterval(fetchItems, 60000);
 
 fetchItems();
 </script>

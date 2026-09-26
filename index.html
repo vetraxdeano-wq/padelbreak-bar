@@ -52,6 +52,15 @@
 
   .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
 
+  @media (max-width: 380px) {
+    .item-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .brand img { height: 18px; }
+    .page { padding-left: 12px; padding-right: 12px; }
+  }
+  @media (min-width: 900px) {
+    .item-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  }
+
   .item-card {
     display: flex; flex-direction: column; gap: 10px;
     background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
@@ -310,6 +319,10 @@ function sortCategoryItems(list) {
 }
 
 function render() {
+  // Un changement temps réel (le nôtre ou celui d'un autre appareil) peut arriver
+  // pendant un glisser-déposer : on ne touche pas au DOM tant que ça dure, sinon
+  // les cartes qu'on est en train de déplacer sont recréées sous le doigt/la souris.
+  if (isDragging) return;
   if (!items.length) {
     content.innerHTML = '<p class="empty-state">Aucun article. Ajoute le premier avec le bouton +.</p>';
     return;
@@ -660,6 +673,7 @@ document.getElementById("refreshBtn").addEventListener("click", fetchItems);
 
 // ---- Réordonnancement manuel des cartes (glisser-déposer, souris + tactile, grille) ----
 let dragState = null;
+let isDragging = false;
 
 content.addEventListener("pointerdown", (e) => {
   const handle = e.target.closest(".item-drag");
@@ -668,57 +682,80 @@ content.addEventListener("pointerdown", (e) => {
   const grid = card?.parentElement;
   if (!card || !grid) return;
   e.preventDefault();
-  dragState = { card, grid, startX: e.clientX, startY: e.clientY };
+  isDragging = true;
+  dragState = { card, grid, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY };
   card.classList.add("dragging");
   card.style.position = "relative";
   card.style.zIndex = 5;
+  // La capture du pointeur évite de perdre le suivi si le doigt glisse vite
+  // hors de la poignée (source fréquente de glissers "ratés" au tactile).
+  try { handle.setPointerCapture(e.pointerId); } catch (err) {}
   document.addEventListener("pointermove", onPointerMove);
   document.addEventListener("pointerup", onPointerUp, { once: true });
+  document.addEventListener("pointercancel", onPointerUp, { once: true });
 });
 
 function onPointerMove(e) {
-  if (!dragState) return;
+  if (!dragState || e.pointerId !== dragState.pointerId) return;
   const { card, grid } = dragState;
   const dx = e.clientX - dragState.startX;
   const dy = e.clientY - dragState.startY;
   card.style.transform = `translate(${dx}px, ${dy}px)`;
 
   const cardRect = card.getBoundingClientRect();
-  const cx = cardRect.left + cardRect.width / 2;
+  const cx = Math.min(Math.max(cardRect.left + cardRect.width / 2, 0), window.innerWidth);
   const cy = cardRect.top + cardRect.height / 2;
 
   const siblings = Array.from(grid.querySelectorAll(".item-card")).filter((c) => c !== card);
+  let target = null;
   for (const sib of siblings) {
     const r = sib.getBoundingClientRect();
-    if (cx > r.left && cx < r.right && cy > r.top && cy < r.bottom) {
-      const order = Array.from(grid.children);
-      const cardIndex = order.indexOf(card);
-      const sibIndex = order.indexOf(sib);
-      if (cardIndex < sibIndex) grid.insertBefore(card, sib.nextSibling);
-      else grid.insertBefore(card, sib);
-      dragState.startX = e.clientX;
-      dragState.startY = e.clientY;
-      card.style.transform = "";
-      break;
-    }
+    if (cx > r.left && cx < r.right && cy > r.top && cy < r.bottom) { target = sib; break; }
+  }
+  // Si le pointeur dépasse la dernière carte ou n'atteint pas encore la première,
+  // on autorise quand même le dépôt tout au début / tout à la fin de la catégorie.
+  if (!target && siblings.length) {
+    const first = siblings[0];
+    const last = siblings[siblings.length - 1];
+    const firstRect = first.getBoundingClientRect();
+    const lastRect = last.getBoundingClientRect();
+    if (cy < firstRect.top) target = first;
+    else if (cy > lastRect.bottom) target = "END";
+  }
+  if (target === "END") {
+    grid.appendChild(card);
+    dragState.startX = e.clientX;
+    dragState.startY = e.clientY;
+    card.style.transform = "";
+  } else if (target) {
+    const order = Array.from(grid.children);
+    const cardIndex = order.indexOf(card);
+    const sibIndex = order.indexOf(target);
+    if (cardIndex < sibIndex) grid.insertBefore(card, target.nextSibling);
+    else grid.insertBefore(card, target);
+    dragState.startX = e.clientX;
+    dragState.startY = e.clientY;
+    card.style.transform = "";
   }
 }
 
-async function onPointerUp() {
+async function onPointerUp(e) {
   document.removeEventListener("pointermove", onPointerMove);
-  if (!dragState) return;
+  if (!dragState) { isDragging = false; return; }
   const { card, grid } = dragState;
   card.classList.remove("dragging");
   card.style.transform = "";
   card.style.zIndex = "";
   dragState = null;
+  isDragging = false;
 
   const ids = Array.from(grid.querySelectorAll(".item-card")).map((c) => c.dataset.id);
   ids.forEach((id, idx) => {
     const it = items.find((i) => i.id === id);
     if (it) it.ordre = idx;
   });
-  await sb.rpc("set_items_order", { p_ids: ids });
+  const { error } = await sb.rpc("set_items_order", { p_ids: ids });
+  if (error) alert("Erreur lors de l'enregistrement de l'ordre : " + error.message);
   fetchItems();
 }
 

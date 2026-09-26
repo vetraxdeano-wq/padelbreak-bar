@@ -76,6 +76,8 @@
     padding: 10px 12px; touch-action: pan-y;
   }
   .item-card.low { border-color: var(--danger); border-width: 1.5px; }
+  .item-card.out { border-color: var(--danger); border-width: 2px; background: #2a1416; }
+  .item-meta.out-meta { font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
   .item-card.dragging { opacity: 0.97; box-shadow: 0 14px 30px rgba(0,0,0,0.5); transform: scale(1.04); pointer-events: none; }
   .drag-placeholder { border: 1.5px dashed var(--accent); border-radius: 14px; background: var(--surface-2); opacity: 0.5; }
 
@@ -116,6 +118,8 @@
   .stats-heading { color: var(--mute); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.08em; margin: 0 0 10px 4px; font-weight: 700; }
   .stats-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; font-size: 0.9rem; flex-wrap: wrap; }
   .stats-row .stats-name { font-weight: 600; }
+  .stats-hist-link { background: none; border: none; color: var(--accent); font-family: inherit; font-size: 0.75rem; font-weight: 600; padding: 0 0 0 8px; text-decoration: underline; }
+  .stats-hist-reset { background: none; border: none; color: var(--accent); font-family: inherit; font-size: 0.75rem; font-weight: 700; padding: 0 0 0 10px; text-decoration: underline; text-transform: none; letter-spacing: normal; }
   .stats-row .pos { color: var(--success); font-variant-numeric: tabular-nums; }
   .stats-row .neg { color: var(--danger); font-variant-numeric: tabular-nums; }
   .stats-row .stats-date { color: var(--mute); font-size: 0.78rem; width: 100%; }
@@ -146,6 +150,8 @@
   .empty-state { color: var(--mute); text-align: center; margin-top: 60px; }
   .usage-hint { color: var(--mute); font-size: 0.8rem; line-height: 1.4; margin: -8px 0 16px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
   .usage-hint strong { color: var(--ink); }
+  .filter-toggle { display: block; width: 100%; margin: 10px 0; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--mute); font-family: inherit; font-weight: 700; font-size: 0.85rem; }
+  .filter-toggle.active { border-color: var(--danger); color: var(--danger); background: #2a1416; }
 </style>
 </head>
 <body>
@@ -166,6 +172,7 @@
     <button type="button" class="view-tab" id="tabStatsBtn" data-view="stats">Stats</button>
   </div>
   <input type="search" id="searchInput" class="search-input" placeholder="Rechercher un article…">
+  <button type="button" id="lowStockToggle" class="filter-toggle">⚠️ Stock bas uniquement</button>
   <p class="usage-hint">➖ Vente faite / fût changé → appuie sur le <strong>−</strong>. 📦 Commande reçue → appuie sur <strong>📦</strong>, choisis « + Quantité reçue ».</p>
   <div id="content"><p class="empty-state">Chargement…</p></div>
   <div id="statsContent" class="hidden"></div>
@@ -279,6 +286,7 @@ let restockSubmitting = false;
 let thumbTargetId = null;
 let view = "inventory";
 let searchQuery = "";
+let lowStockOnly = false;
 
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -354,11 +362,13 @@ function render() {
     content.innerHTML = '<p class="empty-state">Aucun article. Ajoute le premier avec le bouton +.</p>';
     return;
   }
-  const visibleItems = searchQuery
-    ? items.filter((i) => i.nom.toLowerCase().includes(searchQuery))
-    : items;
+  const visibleItems = items.filter((i) => {
+    if (searchQuery && !i.nom.toLowerCase().includes(searchQuery)) return false;
+    if (lowStockOnly && !(i.seuil_alerte != null && i.quantite <= i.seuil_alerte)) return false;
+    return true;
+  });
   if (!visibleItems.length) {
-    content.innerHTML = '<p class="empty-state">Aucun article ne correspond à la recherche.</p>';
+    content.innerHTML = `<p class="empty-state">${lowStockOnly ? "Aucun article en stock bas 🎉" : "Aucun article ne correspond à la recherche."}</p>`;
     return;
   }
   const map = {};
@@ -384,8 +394,9 @@ function render() {
 
 function itemRowHtml(item) {
   const low = item.seuil_alerte != null && item.quantite <= item.seuil_alerte;
+  const out = item.quantite <= 0;
   const pending = pendingIds.has(item.id);
-  return `<div class="item-card ${low ? "low" : ""}" data-id="${item.id}" data-cat="${item.categorie || "autre"}">
+  return `<div class="item-card ${out ? "out" : low ? "low" : ""}" data-id="${item.id}" data-cat="${item.categorie || "autre"}">
     <div class="item-card-top">
       <button class="item-drag" aria-label="Réordonner">⠿</button>
       <button class="item-thumb${item.image_url ? " has-photo" : ""}" data-action="thumb" data-id="${item.id}" aria-label="Ajouter/changer la photo">
@@ -396,7 +407,7 @@ function itemRowHtml(item) {
           <span class="item-name">${escapeHtml(item.nom)}</span>
           <button class="item-edit-btn" data-action="edit" data-id="${item.id}" aria-label="Modifier">✏️</button>
         </div>
-        ${low ? `<div class="item-meta">Stock bas</div>` : ""}
+        ${out ? `<div class="item-meta out-meta">Rupture totale</div>` : low ? `<div class="item-meta">Stock bas</div>` : ""}
       </div>
       <button class="item-delete" data-action="delete" data-id="${item.id}">✕</button>
     </div>
@@ -412,6 +423,8 @@ function itemRowHtml(item) {
 }
 
 // ---- Vue Statistiques : conso moyenne + historique des mouvements ----
+let statsFilterId = null;
+let statsFilterNom = "";
 async function renderStats() {
   statsContent.innerHTML = '<p class="empty-state">Chargement…</p>';
 
@@ -424,7 +437,9 @@ async function renderStats() {
             .sort((a, b) => b.conso_moyenne_jour - a.conso_moyenne_jour)
             .map(
               (it) => `<div class="stats-row">
-                <span class="stats-name">${escapeHtml(it.nom)}</span>
+                <span class="stats-name">${escapeHtml(it.nom)}
+                  <button type="button" class="stats-hist-link" data-action="stats-hist" data-id="${it.id}" data-nom="${escapeHtml(it.nom)}">historique</button>
+                </span>
                 <span>${it.conso_moyenne_jour > 0 ? `≈${it.conso_moyenne_jour}/jour` : "—"}</span>
               </div>`
             )
@@ -433,14 +448,19 @@ async function renderStats() {
     }
   </div>`;
 
-  const { data: mvts, error } = await sb
+  let query = sb
     .from("mouvements_stock")
     .select("id, delta, type, created_at, inventaire_bar(nom)")
     .order("created_at", { ascending: false })
     .limit(HISTORIQUE_LIMITE);
+  if (statsFilterId) query = query.eq("item_id", statsFilterId);
+  const { data: mvts, error } = await query;
 
   const histHtml = `<div class="stats-section">
-    <p class="stats-heading">Historique des mouvements (${HISTORIQUE_LIMITE} derniers)</p>
+    <p class="stats-heading">
+      ${statsFilterId ? `Historique — ${escapeHtml(statsFilterNom)}` : `Historique des mouvements (${HISTORIQUE_LIMITE} derniers)`}
+      ${statsFilterId ? `<button type="button" class="stats-hist-reset" id="statsHistReset">✕ voir tout</button>` : ""}
+    </p>
     ${
       error
         ? `<p class="empty-state">Erreur : ${escapeHtml(error.message)}</p>`
@@ -475,6 +495,17 @@ async function resetStats() {
 }
 statsContent.addEventListener("click", (e) => {
   if (e.target.closest("#resetStatsBtn")) resetStats();
+  const histBtn = e.target.closest("[data-action='stats-hist']");
+  if (histBtn) {
+    statsFilterId = histBtn.dataset.id;
+    statsFilterNom = histBtn.dataset.nom;
+    renderStats();
+  }
+  if (e.target.closest("#statsHistReset")) {
+    statsFilterId = null;
+    statsFilterNom = "";
+    renderStats();
+  }
 });
 
 function setView(v) {
@@ -491,6 +522,12 @@ document.getElementById("tabInventoryBtn").addEventListener("click", () => setVi
 document.getElementById("tabStatsBtn").addEventListener("click", () => setView("stats"));
 document.getElementById("searchInput").addEventListener("input", (e) => {
   searchQuery = e.target.value.trim().toLowerCase();
+  render();
+});
+const lowStockToggle = document.getElementById("lowStockToggle");
+lowStockToggle.addEventListener("click", () => {
+  lowStockOnly = !lowStockOnly;
+  lowStockToggle.classList.toggle("active", lowStockOnly);
   render();
 });
 

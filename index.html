@@ -551,9 +551,8 @@ function processImage(file) {
       canvas.width = THUMB_SIZE;
       canvas.height = THUMB_SIZE;
       const ctx = canvas.getContext("2d");
-      // Fond neutre assorti au thème de l'appli (mêmes teintes que .item-thumb).
-      ctx.fillStyle = "#142036";
-      ctx.fillRect(0, 0, THUMB_SIZE, THUMB_SIZE);
+      // Fond transparent (pas de couleur unie) : seul le produit reste visible,
+      // sans cadre autour, quelle que soit la forme de la photo d'origine.
       const scale = Math.min(THUMB_SIZE / img.width, THUMB_SIZE / img.height);
       const w = img.width * scale;
       const h = img.height * scale;

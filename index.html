@@ -118,8 +118,14 @@
   .stats-heading { color: var(--mute); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.08em; margin: 0 0 10px 4px; font-weight: 700; }
   .stats-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; font-size: 0.9rem; flex-wrap: wrap; }
   .stats-row .stats-name { font-weight: 600; }
-  .stats-hist-link { background: none; border: none; color: var(--accent); font-family: inherit; font-size: 0.75rem; font-weight: 600; padding: 0 0 0 8px; text-decoration: underline; }
-  .stats-hist-reset { background: none; border: none; color: var(--accent); font-family: inherit; font-size: 0.75rem; font-weight: 700; padding: 0 0 0 10px; text-decoration: underline; text-transform: none; letter-spacing: normal; }
+  .conso-row { justify-content: space-between; }
+  .conso-values { display: flex; gap: 8px; }
+  .conso-badge { background: var(--surface-2); color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; padding: 4px 9px; border-radius: 999px; font-size: 0.85rem; }
+  .conso-badge small { font-weight: 600; color: var(--mute); font-size: 0.68rem; margin-left: 1px; }
+  .conso-badge.alt { color: var(--mute); }
+  .stats-hist-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface-2); font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .stats-hist-btn:active { background: var(--accent-ink); border-color: var(--accent); }
+  .stats-hist-reset { background: var(--surface-2); border: 1px solid var(--line); color: var(--accent); font-family: inherit; font-size: 0.75rem; font-weight: 700; padding: 5px 12px; border-radius: 999px; text-transform: none; letter-spacing: normal; margin-left: 10px; vertical-align: middle; }
   .stats-row .pos { color: var(--success); font-variant-numeric: tabular-nums; }
   .stats-row .neg { color: var(--danger); font-variant-numeric: tabular-nums; }
   .stats-row .stats-date { color: var(--mute); font-size: 0.78rem; width: 100%; }
@@ -152,6 +158,11 @@
   .usage-hint strong { color: var(--ink); }
   .filter-toggle { display: block; width: 100%; margin: 10px 0; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--mute); font-family: inherit; font-weight: 700; font-size: 0.85rem; }
   .filter-toggle.active { border-color: var(--danger); color: var(--danger); background: #2a1416; }
+  .filter-row { display: flex; align-items: center; gap: 8px; margin: 8px 0 16px; }
+  .filter-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--mute); font-family: inherit; font-weight: 600; font-size: 0.78rem; }
+  .filter-chip-box { font-size: 0.95rem; line-height: 1; }
+  .filter-chip.active { border-color: var(--danger); color: var(--danger); background: #2a1416; }
+  .filter-row-note { color: var(--mute); font-size: 0.72rem; font-style: italic; opacity: 0.75; }
 </style>
 </head>
 <body>
@@ -172,7 +183,13 @@
     <button type="button" class="view-tab" id="tabStatsBtn" data-view="stats">Stats</button>
   </div>
   <input type="search" id="searchInput" class="search-input" placeholder="Rechercher un article…">
-  <button type="button" id="lowStockToggle" class="filter-toggle">⚠️ Stock bas uniquement</button>
+  <div class="filter-row">
+    <button type="button" id="lowStockToggle" class="filter-chip" aria-pressed="false">
+      <span class="filter-chip-box">☐</span>
+      Filtre : stock bas uniquement
+    </button>
+    <span class="filter-row-note">seul filtre disponible</span>
+  </div>
   <p class="usage-hint">➖ Vente faite / fût changé → appuie sur le <strong>−</strong>. 📦 Commande reçue → appuie sur <strong>📦</strong>, choisis « + Quantité reçue ».</p>
   <div id="content"><p class="empty-state">Chargement…</p></div>
   <div id="statsContent" class="hidden"></div>
@@ -338,6 +355,7 @@ async function fetchItems() {
     return {
       ...item,
       conso_moyenne_jour: Math.round((totalConso / joursSuivis) * 10) / 10,
+      conso_moyenne_mois: Math.round((totalConso / joursSuivis) * 30),
       mouvements: mouvementCount[item.id] || 0,
     };
   });
@@ -436,11 +454,13 @@ async function renderStats() {
             .slice()
             .sort((a, b) => b.conso_moyenne_jour - a.conso_moyenne_jour)
             .map(
-              (it) => `<div class="stats-row">
-                <span class="stats-name">${escapeHtml(it.nom)}
-                  <button type="button" class="stats-hist-link" data-action="stats-hist" data-id="${it.id}" data-nom="${escapeHtml(it.nom)}">historique</button>
+              (it) => `<div class="stats-row conso-row">
+                <span class="stats-name">${escapeHtml(it.nom)}</span>
+                <span class="conso-values">
+                  <span class="conso-badge">${it.conso_moyenne_jour > 0 ? `${it.conso_moyenne_jour}<small>/j</small>` : "—"}</span>
+                  <span class="conso-badge alt">${it.conso_moyenne_mois > 0 ? `${it.conso_moyenne_mois}<small>/mois</small>` : "—"}</span>
                 </span>
-                <span>${it.conso_moyenne_jour > 0 ? `≈${it.conso_moyenne_jour}/jour` : "—"}</span>
+                <button type="button" class="stats-hist-btn" data-action="stats-hist" data-id="${it.id}" data-nom="${escapeHtml(it.nom)}" aria-label="Historique de ${escapeHtml(it.nom)}" title="Voir l'historique">🕓</button>
               </div>`
             )
             .join("")
@@ -459,7 +479,7 @@ async function renderStats() {
   const histHtml = `<div class="stats-section">
     <p class="stats-heading">
       ${statsFilterId ? `Historique — ${escapeHtml(statsFilterNom)}` : `Historique des mouvements (${HISTORIQUE_LIMITE} derniers)`}
-      ${statsFilterId ? `<button type="button" class="stats-hist-reset" id="statsHistReset">✕ voir tout</button>` : ""}
+      ${statsFilterId ? `<button type="button" class="stats-hist-reset" id="statsHistReset">✕ Voir tout l'historique</button>` : ""}
     </p>
     ${
       error
@@ -528,6 +548,8 @@ const lowStockToggle = document.getElementById("lowStockToggle");
 lowStockToggle.addEventListener("click", () => {
   lowStockOnly = !lowStockOnly;
   lowStockToggle.classList.toggle("active", lowStockOnly);
+  lowStockToggle.setAttribute("aria-pressed", String(lowStockOnly));
+  lowStockToggle.querySelector(".filter-chip-box").textContent = lowStockOnly ? "☑" : "☐";
   render();
 });
 

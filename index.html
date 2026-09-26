@@ -37,12 +37,21 @@
 
   .page { max-width: 1700px; margin: 0 auto; padding: 20px 16px calc(100px + env(safe-area-inset-bottom, 0px)); }
 
-  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; gap: 10px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px; }
+  .brand-col { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .brand img { height: 22px; width: auto; display: block; }
+  .brand-sub { color: var(--mute); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.09em; font-weight: 700; margin-left: 1px; }
   .header-actions { display: flex; gap: 4px; flex-shrink: 0; }
   .header-actions button { background: none; border: none; color: var(--mute); font-size: 1.15rem; width: 36px; height: 36px; border-radius: 9px; }
   .header-actions button:active, .header-actions button.active { background: var(--surface); color: var(--ink); }
+
+  .view-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .view-tab { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--mute); font-family: inherit; font-size: 0.85rem; font-weight: 700; }
+  .view-tab.active { border-color: var(--accent); color: var(--accent); background: var(--accent-ink); }
+
+  .search-input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 0.95rem; font-family: inherit; margin-bottom: 18px; }
+  .search-input::placeholder { color: var(--mute); }
 
   .category-group { margin-bottom: 24px; }
   .category-head { display: flex; align-items: baseline; gap: 8px; margin: 0 2px 8px; }
@@ -76,6 +85,7 @@
   .item-drag { cursor: grab; color: var(--mute); font-size: 1rem; padding: 2px 4px; flex-shrink: 0; touch-action: none; user-select: none; background: none; border: none; }
 
   .item-thumb { width: 36px; height: 36px; border-radius: 9px; border: 1px dashed var(--line); background: var(--surface-2); flex-shrink: 0; padding: 3px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .item-thumb.has-photo { width: 44px; height: 44px; border: none; background: none; padding: 0; }
   .item-thumb img { width: 100%; height: 100%; object-fit: contain; }
   .item-thumb-placeholder { color: var(--mute); font-size: 1rem; }
 
@@ -101,7 +111,7 @@
   .fab { position: fixed; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); right: 24px; width: 56px; height: 56px; border-radius: 50%; background: var(--accent); color: #fff; border: none; font-size: 1.8rem; font-weight: 700; box-shadow: 0 8px 20px rgba(58,99,201,0.4); }
 
   .stats-section { margin-bottom: 28px; }
-  .reset-btn { background: var(--surface); border: 1px solid var(--danger); color: var(--danger); padding: 10px 14px; border-radius: 10px; font-weight: 700; font-family: inherit; margin-bottom: 20px; }
+  .reset-btn { background: var(--surface); border: 1px solid var(--danger); color: var(--danger); padding: 10px 14px; border-radius: 10px; font-weight: 700; font-family: inherit; margin: 4px 0 0; }
   .reset-btn:active { background: #2a1416; }
   .stats-heading { color: var(--mute); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.08em; margin: 0 0 10px 4px; font-weight: 700; }
   .stats-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; font-size: 0.9rem; flex-wrap: wrap; }
@@ -109,6 +119,10 @@
   .stats-row .pos { color: var(--success); font-variant-numeric: tabular-nums; }
   .stats-row .neg { color: var(--danger); font-variant-numeric: tabular-nums; }
   .stats-row .stats-date { color: var(--mute); font-size: 0.78rem; width: 100%; }
+  .type-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+  .type-badge.vente { background: #2a1416; color: var(--danger); }
+  .type-badge.reappro { background: #0e2a1c; color: var(--success); }
+  .type-badge.ajustement { background: var(--surface-2); color: var(--mute); }
 
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: flex-end; justify-content: center; z-index: 20; }
   .modal-card { background: var(--surface); border-top: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 24px 20px calc(32px + env(safe-area-inset-bottom, 0px)); width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; }
@@ -135,14 +149,21 @@
 <body>
 <div class="page">
   <div class="page-header">
+    <div class="brand-col">
     <div class="brand">
       <img src="data:image/png;base64,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" alt="Padel Break">
     </div>
+      <span class="brand-sub">Inventaire bar</span>
+    </div>
     <div class="header-actions">
-      <button id="statsBtn" title="Statistiques">📊</button>
       <button id="refreshBtn" title="Rafraîchir">↻</button>
     </div>
   </div>
+  <div class="view-tabs">
+    <button type="button" class="view-tab active" id="tabInventoryBtn" data-view="inventory">Inventaire</button>
+    <button type="button" class="view-tab" id="tabStatsBtn" data-view="stats">Stats</button>
+  </div>
+  <input type="search" id="searchInput" class="search-input" placeholder="Rechercher un article…">
   <div id="content"><p class="empty-state">Chargement…</p></div>
   <div id="statsContent" class="hidden"></div>
   <button class="fab" id="addBtn" aria-label="Ajouter un article">+</button>
@@ -253,6 +274,7 @@ let restockItem = null;
 let restockMode = "ajout";
 let thumbTargetId = null;
 let view = "inventory";
+let searchQuery = "";
 
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -328,8 +350,15 @@ function render() {
     content.innerHTML = '<p class="empty-state">Aucun article. Ajoute le premier avec le bouton +.</p>';
     return;
   }
+  const visibleItems = searchQuery
+    ? items.filter((i) => i.nom.toLowerCase().includes(searchQuery))
+    : items;
+  if (!visibleItems.length) {
+    content.innerHTML = '<p class="empty-state">Aucun article ne correspond à la recherche.</p>';
+    return;
+  }
   const map = {};
-  for (const item of items) {
+  for (const item of visibleItems) {
     const cat = item.categorie || "autre";
     (map[cat] ||= []).push(item);
   }
@@ -355,7 +384,7 @@ function itemRowHtml(item) {
   return `<div class="item-card ${low ? "low" : ""}" data-id="${item.id}" data-cat="${item.categorie || "autre"}">
     <div class="item-card-top">
       <button class="item-drag" aria-label="Réordonner">⠿</button>
-      <button class="item-thumb" data-action="thumb" data-id="${item.id}" aria-label="Ajouter/changer la photo">
+      <button class="item-thumb${item.image_url ? " has-photo" : ""}" data-action="thumb" data-id="${item.id}" aria-label="Ajouter/changer la photo">
         ${item.image_url ? `<img src="${escapeHtml(item.image_url)}" alt="">` : `<span class="item-thumb-placeholder">＋</span>`}
       </button>
       <div class="item-info">
@@ -416,7 +445,8 @@ async function renderStats() {
             .map(
               (m) => `<div class="stats-row">
                 <span class="stats-name">${escapeHtml(m.inventaire_bar?.nom || "Article supprimé")}</span>
-                <span class="${m.delta < 0 ? "neg" : "pos"}">${m.delta > 0 ? "+" : ""}${m.delta} · ${escapeHtml(TYPE_LABELS[m.type] || m.type)}</span>
+                <span class="type-badge ${escapeHtml(m.type)}">${escapeHtml(TYPE_LABELS[m.type] || m.type)}</span>
+                <span class="${m.delta < 0 ? "neg" : "pos"}">${m.delta > 0 ? "+" : ""}${m.delta}</span>
                 <span class="stats-date">${new Date(m.created_at).toLocaleString("fr-FR")}</span>
               </div>`
             )
@@ -425,7 +455,7 @@ async function renderStats() {
     }
   </div>`;
 
-  statsContent.innerHTML = `<button class="reset-btn" id="resetStatsBtn" type="button">Réinitialiser les statistiques</button>` + consoHtml + histHtml;
+  statsContent.innerHTML = consoHtml + histHtml + `<button class="reset-btn" id="resetStatsBtn" type="button">Réinitialiser les statistiques</button>`;
 }
 
 async function resetStats() {
@@ -445,14 +475,20 @@ statsContent.addEventListener("click", (e) => {
 
 function setView(v) {
   view = v;
-  document.getElementById("statsBtn").textContent = v === "inventory" ? "📊" : "◀";
-  document.getElementById("statsBtn").classList.toggle("active", v === "stats");
+  document.getElementById("tabInventoryBtn").classList.toggle("active", v === "inventory");
+  document.getElementById("tabStatsBtn").classList.toggle("active", v === "stats");
   content.classList.toggle("hidden", v !== "inventory");
+  document.getElementById("searchInput").classList.toggle("hidden", v !== "inventory");
   document.getElementById("addBtn").classList.toggle("hidden", v !== "inventory");
   statsContent.classList.toggle("hidden", v !== "stats");
   if (v === "stats") renderStats();
 }
-document.getElementById("statsBtn").addEventListener("click", () => setView(view === "inventory" ? "stats" : "inventory"));
+document.getElementById("tabInventoryBtn").addEventListener("click", () => setView("inventory"));
+document.getElementById("tabStatsBtn").addEventListener("click", () => setView("stats"));
+document.getElementById("searchInput").addEventListener("input", (e) => {
+  searchQuery = e.target.value.trim().toLowerCase();
+  render();
+});
 
 async function adjustStock(id, delta) {
   const item = items.find((i) => i.id === id);
